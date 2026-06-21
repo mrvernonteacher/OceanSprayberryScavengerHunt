@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wonder Hunt</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root { --p: #10b981; --bg: #0f172a; --card: #1e293b; --err: #ef4444; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; margin: 0; padding: 20px; text-align: center; }
+        .box, .card { background: var(--card); padding: 25px; border-radius: 12px; max-width: 500px; margin: 0 auto 15px auto; border: 1px solid #334155; box-shadow: 0 8px 16px rgba(0,0,0,0.4); box-sizing: border-box;}
+        h1, h2 { color: var(--p); text-transform: uppercase; letter-spacing: 2px; margin-top: 0; }
+        .desc { font-size: 0.9em; color: #94a3b8; margin-bottom: 20px; }
+        
+        .panel-section { background: #0f172a; border: 1px dashed #475569; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: left;}
+        .team-box { margin: 10px 0; padding: 10px; background: #334155; border-radius: 6px; font-weight: bold; color: #fbbf24; text-align: center;}
+        
+        select, input[type="text"], input[type="password"] { width: 100%; padding: 12px; margin: 8px 0 15px 0; border-radius: 6px; background: #0f172a; color: white; border: 1px solid #475569; font-size: 1em; box-sizing: border-box; font-weight: bold;}
+        button.action { background: var(--p); color: #0f172a; padding: 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; text-transform: uppercase; font-size: 1.05em; margin-top: 10px; transition: background 0.2s;}
+        button.action:hover { background: #059669; }
+        button.action:disabled { background: #475569; color: #94a3b8; cursor: not-allowed; }
+        .btn-alt { background: #8b5cf6; color: white; }
+        .btn-alt:hover { background: #7c3aed; }
+        .btn-danger { background: var(--err); color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-win { background: #fbbf24; color: #0f172a; }
+        .btn-win:hover { background: #f59e0b; }
+        
+        label { display: block; text-align: left; font-weight: bold; color: #94a3b8; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px;}
+        .status-bar { font-size: 0.8em; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; border-bottom: 1px solid #334155; padding-bottom: 10px;}
+        
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.98); z-index: 1000; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 30px; box-sizing: border-box; }
+        .error-msg { color: var(--err); font-size: 1.3em; font-weight: bold; margin-bottom: 20px; line-height: 1.4;}
+        img.captured { width: 100%; border-radius: 8px; margin-top: 15px; border: 2px solid var(--p); }
+        .strip-img { width: 100%; border-radius: 6px; margin-bottom: 10px; border: 2px solid #334155; }
+        .hack-text { background: #334155; padding: 15px; border-radius: 8px; font-style: italic; font-size: 0.9em; text-align: left; color: #cbd5e1; border-left: 4px solid #f59e0b; line-height: 1.5;}
+        
+        .strip-card { background: #1e293b; padding: 10px 10px 15px 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #334155; box-shadow: 0 4px 6px rgba(0,0,0,0.2);}
+        .strip-caption { color: var(--p); font-weight: bold; text-transform: uppercase; font-size: 0.9em; margin-top: 5px; line-height: 1.4;}
+        .strip-time { color: #fbbf24; font-size: 0.85em; }
+
+        .timelock-display { font-size: 2.5em; font-family: monospace; font-weight: bold; color: var(--p); background: #0f172a; padding: 20px; border-radius: 8px; border: 2px solid #334155; margin-bottom: 15px;}
+    </style>
+</head>
+<body>
+
+    <div id="timelock-screen" class="box" style="display: none; padding: 40px 20px; margin-top: 10vh;">
+        <h1 style="color: var(--err); font-size: 1.8em; margin-bottom: 10px;">🔒 MISSION CLASSIFIED 🔒</h1>
+        <p style="color: #cbd5e1; font-size: 1.0em; margin-bottom: 30px;">This tactical asset is strictly embargoed until we set sail.</p>
+        <div class="timelock-display" id="countdown-timer">--:--:--:--</div>
+        <p style="color: #94a3b8; font-size: 0.8em; margin-top: 10px; text-transform: uppercase;">Awaiting Satellite Sync...</p>
+        
+        <div style="margin-top: 40px; border-top: 1px dashed #475569; padding-top: 20px;">
+            <input type="password" id="override-pw" placeholder="Admin Override Code" style="width: 80%; padding: 10px; font-size: 0.9em;">
+            <button class="action btn-alt" style="width: 80%; padding: 10px; font-size: 0.9em; margin-top: 5px;" onclick="checkOverride()">Bypass Lock</button>
+        </div>
+    </div>
+
+    <div id="main-app-wrapper" style="display: none;">
+        
+        <div class="status-bar" id="status">Unit Status: Configuration Mode</div>
+
+        <div id="setup-step" class="box">
+            <h1>🕵️ WonderHunt Set-Up 🕵️</h1>
+            <p class="desc">Setup matches offline. One person rolls the randomizer, everyone fills matching inputs below, then clicks start simultaneously.</p>
+            
+            <div class="panel-section">
+                <button class="action btn-alt" style="margin-top:0;" id="btnRandom">🎲 Randomize Teams 🎲</button>
+                <div id="teamOutput" style="display: none; margin-top: 10px;">
+                    <div class="team-box" id="teamA_suggest">Alpha: --</div>
+                    <div class="team-box" id="teamB_suggest">Bravo: --</div>
+                </div>
+            </div>
+
+            <div class="panel-section" style="border-style: solid; border-color: var(--p);">
+                <h3 style="margin-top:0; color: var(--p); text-align:center;">⚙️ MANUAL LIVE SYNC ⚙️</h3>
+                
+                <label>1. Final Convergence Point (Stop 5)</label>
+                <select id="finalStop">
+                    <option value="Playmakers">Playmakers</option>
+                    <option value="Pool Giant Screen">Pool Giant Screen</option>
+                    <option value="Cask & Clipper (English Pub)">Cask & Clipper (English Pub)</option>
+                    <option value="Music Hall">Music Hall</option>
+                    <option value="Casino Royale Bar">Casino Royale Bar</option>
+                    <option value="Cantina Fresca">Cantina Fresca</option>
+                    <option value="Lime & Coconut">Lime & Coconut</option>
+                    <option value="Mason Jar Bar">Mason Jar Bar</option>
+                    <option value="Boleros">Boleros</option>
+                    <option value="Schooner Bar">Schooner Bar</option>
+                    <option value="Bionic Bar">Bionic Bar</option>
+                    <option value="Vue Bar">Vue Bar</option>
+                </select>
+
+                <label>2. Which Squad is THIS phone running?</label>
+                <select id="deviceSquad">
+                    <option value="Alpha">Alpha Squad</option>
+                    <option value="Bravo">Bravo Squad</option>
+                </select>
+
+                <label>3. Assign Alpha Squad Operators</label>
+                <div style="display:flex; justify-content:space-between; gap: 10px;">
+                    <select id="p1"><option value="Ty">Ty</option><option value="Angel">Angel</option><option value="Laurel">Laurel</option><option value="Shannon" selected>Shannon</option></select>
+                    <select id="p2"><option value="Ty">Ty</option><option value="Angel" selected>Angel</option><option value="Laurel">Laurel</option><option value="Shannon">Shannon</option></select>
+                </div>
+
+                <label>4. Assign Bravo Squad Operators</label>
+                <div style="display:flex; justify-content:space-between; gap: 10px;">
+                    <select id="p3"><option value="Ty">Ty</option><option value="Angel">Angel</option><option value="Laurel" selected>Laurel</option><option value="Shannon">Shannon</option></select>
+                    <select id="p4"><option value="Ty" selected>Ty</option><option value="Angel">Angel</option><option value="Laurel">Laurel</option><option value="Shannon">Shannon</option></select>
+                </div>
+            </div>
+
+            <button class="action" onclick="initializeLiveHunt()">🚀 Initialize Live Hunt 🚀</button>
+        </div>
+
+        <div id="hunt-step" class="card" style="display: none;">
+            <h2 id="team-name-display" style="font-size: 1.4em;"></h2>
+            <h3 id="location-title" style="margin-bottom: 5px; color: white;"></h3>
+            <p id="location-drinks" style="color: #fbbf24; font-weight: bold; font-size: 0.9em; margin-top: 0;"></p>
+            <p id="location-task" style="line-height: 1.5; color: #cbd5e1; font-size: 1.1em; padding-top: 10px; border-top: 1px solid #334155;"></p>
+            
+            <input type="file" id="cam-input" accept="image/*" capture="camera" style="display:none" onchange="handlePhoto(this)">
+            
+            <button class="action" id="btn-camera" onclick="cameraButtonClicked()">📸 Take Selfie 📸</button>
+            <button class="action btn-alt" id="btn-next" style="display:none;" onclick="advanceStop()">➡️ Proceed to Next Objective ➡️</button>
+            
+            <button class="action btn-win" id="btn-win" style="display:none;" onclick="finishHunt('WINNERS')">🏆 We Were First! (WINNERS) 🏆</button>
+            <button class="action btn-danger" id="btn-lose" style="display:none;" onclick="finishHunt('LOSERS')">😭 We Were Last. (LOSERS) 😭</button>
+            
+            <div id="photo-preview"></div>
+            <button class="action btn-danger" style="margin-top:30px; font-size:0.8em; padding:10px;" onclick="document.getElementById('abort-modal').style.display='flex'">🚨 Emergency Reset Hunt 🚨</button>
+        </div>
+
+        <div id="photobooth-step" class="card" style="display:none;">
+            <h2>⭐ Mission Accomplished ⭐</h2>
+            <p style="color: #cbd5e1;">Rendering your official tactical photo strip...</p>
+            <div id="render-area" style="background: #0f172a; padding: 20px; border-radius: 10px;">
+                <h2 id="strip-team" style="color: #10b981; margin: 0 0 10px 0; white-space: pre-wrap;"></h2>
+                <h4 id="strip-time" style="color: #94a3b8; margin: 0 0 15px 0; white-space: pre-wrap;"></h4>
+                <div id="strip-photos"></div>
+            </div>
+            <div id="final-export-container" style="margin-top: 20px;"></div>
+            <button class="action btn-danger" style="margin-top:15px;" onclick="wipeDataAndReload()">🔄 Play New Round 🔄</button>
+        </div>
+
+    </div> <div id="recovery-modal" class="overlay">
+        <h2 style="color: #fbbf24; margin-top:0;">🚨 ACTIVE SESSION DETECTED! 🚨</h2>
+        <p style="color: white; font-size: 1.1em;">Crash protection triggered. Would you like to resume your team's hunt?</p>
+        <button class="action" onclick="resumeHunt()">✅ Resume Hunt ✅</button>
+        <button class="action btn-danger" onclick="wipeDataAndReload()">❌ Wipe Data & Start Over ❌</button>
+    </div>
+
+    <div id="abort-modal" class="overlay">
+        <h2 style="color: var(--err); margin-top:0;">🚨 CONFIRM ABORT 🚨</h2>
+        <p style="color: white; font-size: 1.1em;">Are you completely sure you want to stop? All current hunt details, timers, and pictures will be permanently wiped out!</p>
+        <button class="action btn-danger" onclick="wipeDataAndReload()">🔥 YES, DELETE EVERYTHING 🔥</button>
+        <button class="action" style="background: #475569; color: white;" onclick="document.getElementById('abort-modal').style.display='none'">🛡️ CANCEL 🛡️</button>
+    </div>
+
+    <div id="laurel-lock" class="overlay">
+        <h2 style="color:#f59e0b; margin-top:0;">🚨 INCOMING TRANSMISSION 🚨</h2>
+        <p style="color: white; font-weight: bold;">Sender: RYAN</p>
+        <div id="laurel-hack-msg" class="hack-text">
+            "Laurel I've hacked your cruise ship scavenger hunt because I have a sportsball emergency! I realized I sent Max to soccer practice in spandex and knee pads and Allison to volleyball in cleats and shin guards! Things are falling apart here! Please text me and advise what to do? Should I just throw a wig on Max and swap them out? I'm gonna have to buzz Allison's hair! HELP!"
+        </div>
+        <button class="action" id="laurel-btn" style="background: #f59e0b; margin-top: 20px;" onclick="dismissLaurelTrap()">📱 Acknowledge & Text Ryan 📱</button>
+    </div>
+
+    <div id="shannon-lock" class="overlay">
+        <h2 style="color:var(--p)">⚠️ PROTOCOL OVERRIDE ⚠️</h2>
+        <p style="color: white; font-size: 1.1em;">Shannon detected on manifest. Operator must verify Room Number to authenticate current location.</p>
+        <input type="text" id="room-input" placeholder="Enter Room ####">
+        <button class="action" id="room-btn" onclick="checkRoom()">🔐 Verify Identity 🔐</button>
+        <p id="room-err" style="color:var(--err); font-size:0.9em; margin-top:15px; font-weight: bold; line-height: 1.4;"></p>
+    </div>
+
+    <div id="error-modal" class="overlay">
+        <div class="error-msg" id="error-text"></div>
+        <button class="action" onclick="closeError()">🔄 Acknowledge & Retake Selfie 🔄</button>
+    </div>
+
+    <script>
+        // ==========================================
+        // MISSION CONTROL: EMBARGO DATE
+        // Format: YYYY-MM-DDTHH:MM:SS
+        // ==========================================
+        const LAUNCH_DATE = new Date("2026-06-22T12:00:00").getTime(); 
+        let timerInterval;
+
+        let gameState = {
+            active: false, currentStop: 0, startTime: null, lastStopTime: null, stopTimes: [],
+            capturedPhotos: [], finalLocation: "", deviceSquad: "", selectedMembers: [],
+            teamName: "", assignedStops: [], trapAssignments: { angel: -1, laurel: -1, shannon: -1 },
+            bionicFails: 0, angelCleared: false, laurelCleared: false, shannonCleared: false, shannonAttempts: 0,
+            abyssBefore: null, victoryStatus: ""
+        };
+
+        const botFixes = ["Glitch your face.", "Hide your teeth.", "Stare unblinkingly into the lens.", "Mimic a circuit board.", "Execute 'The Robot' move."];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            window.addEventListener('beforeunload', (e) => {
+                if (gameState.active) { e.preventDefault(); e.returnValue = ''; }
+            });
+
+            document.getElementById('btnRandom').addEventListener('click', () => {
+                let roster = ["Ty", "Angel", "Laurel", "Shannon"];
+                for (let i = roster.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [roster[i], roster[j]] = [roster[j], roster[i]];
+                }
+                document.getElementById('teamA_suggest').innerText = "Alpha: " + roster[0] + " & " + roster[1];
+                document.getElementById('teamB_suggest').innerText = "Bravo: " + roster[2] + " & " + roster[3];
+                document.getElementById('teamOutput').style.display = 'block';
+            });
+
+            enforceTimelock();
+        });
+
+        // --- TIMELOCK LOGIC & ADMIN OVERRIDE ---
+        function enforceTimelock() {
+            const now = new Date().getTime();
+            if (now < LAUNCH_DATE) {
+                document.getElementById('main-app-wrapper').style.display = 'none';
+                document.getElementById('timelock-screen').style.display = 'block';
+                
+                timerInterval = setInterval(() => {
+                    const distance = LAUNCH_DATE - new Date().getTime();
+                    if (distance <= 0) {
+                        clearInterval(timerInterval);
+                        document.getElementById('timelock-screen').style.display = 'none';
+                        document.getElementById('main-app-wrapper').style.display = 'block';
+                        checkRecovery(); 
+                    } else {
+                        const d = Math.floor(distance / (1000 * 60 * 60 * 24));
+                        const h = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                        const m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                        const s = Math.floor((distance % (1000 * 60)) / 1000);
+                        document.getElementById("countdown-timer").innerHTML = 
+                            (d < 10 ? "0"+d : d) + "d " + (h < 10 ? "0"+h : h) + "h " + 
+                            (m < 10 ? "0"+m : m) + "m " + (s < 10 ? "0"+s : s) + "s";
+                    }
+                }, 1000);
+            } else {
+                document.getElementById('timelock-screen').style.display = 'none';
+                document.getElementById('main-app-wrapper').style.display = 'block';
+                checkRecovery();
+            }
+        }
+
+        function checkOverride() {
+            const pwInput = document.getElementById('override-pw');
+            if (pwInput.value === "P@$$w0rd") {
+                if (timerInterval) clearInterval(timerInterval);
+                document.getElementById('timelock-screen').style.display = 'none';
+                document.getElementById('main-app-wrapper').style.display = 'block';
+                checkRecovery();
+            } else {
+                alert("❌ ACCESS DENIED ❌");
+                pwInput.value = "";
+            }
+        }
+
+        // --- CORE GAME LOGIC ---
+        function generateStopsArray(finalLoc) {
+            let allStops = [
+                { name: "Playmakers", task: "Take a squad selfie with a sports trophy or TV screen in the background.", drinks: "Fuel: Goal Post Margarita or a Draft IPA" },
+                { name: "Bionic Bar", task: "Take a selfie with the robotic arm mixing a drink in the background.", drinks: "Fuel: Bionic Tonic or Clone Universe" },
+                { name: "The Ultimate Abyss", task: "Take a terrified squad BEFORE selfie at the entrance of the slide.", drinks: "No drinks here. Pure adrenaline required." },
+                { name: "Rising Tide Bar", task: "Take a selfie of the unit while the bar is in vertical motion.", drinks: "Fuel: Blue Hawaiian or Classic Martini" },
+                { name: "Schooner Bar", task: "Take a selfie posing with the grand piano or the nautical rope rigging.", drinks: "Fuel: Lavender Daiquiri" },
+                { name: "Lime & Coconut", task: "Take a selfie floating in the pool with your drinks.", drinks: "Fuel: The signature Lime & Coconut" },
+                { name: "Vue Bar", task: "Take a selfie with the ocean in the background (during the day) or the light-up mosaic canopy (at night).", drinks: "Fuel: The Vue Spritz or Sunset Margarita" },
+                { name: "Boleros", task: "Take a squad selfie on the dance floor.", drinks: "Fuel: Mojito" },
+                { name: "Music Hall", task: "Take a selfie rocking out.", drinks: "Fuel: Long Island Iced Tea" },
+                { name: "Cask & Clipper (English Pub)", task: "Take a 'sophisticated' selfie or one showing a 'reaction to a soccer game' in the background.", drinks: "Fuel: A Pint of Ale or a Pimm's Cup" },
+                { name: "Casino Royale Bar", task: "Take a selfie looking devastated in front of a slot machine or table.", drinks: "Fuel: Vodka Martini - shaken, to ease the pain" }
+            ];
+
+            let validStops = allStops.filter(s => s.name !== finalLoc);
+            validStops.sort(() => Math.random() - 0.5); 
+            
+            let selectedStops = validStops.slice(0, 4); 
+
+            selectedStops.push({
+                name: "CONVERGENCE",
+                task: `Proceed to ${finalLoc}. If the other squad isn't here yet, take a VICTORY CHEERS picture! 🥂 If they are already here, take a LOSERS CHUGGING picture! 🍻`,
+                drinks: "Fuel: Kraken Colada or Miami Vice"
+            });
+
+            return selectedStops;
+        }
+
+        function initializeLiveHunt() {
+            const finalLoc = document.getElementById('finalStop').value;
+            const chosenSquad = document.getElementById('deviceSquad').value;
+            let alpha = [document.getElementById('p1').value, document.getElementById('p2').value];
+            let bravo = [document.getElementById('p3').value, document.getElementById('p4').value];
+            
+            gameState.finalLocation = finalLoc;
+            gameState.deviceSquad = chosenSquad;
+            gameState.selectedMembers = (chosenSquad === "Alpha") ? alpha : bravo;
+
+            if (new Set([...alpha, ...bravo]).size !== 4) return alert("TACTICAL CONFIG ERROR: Duplicate names found across squads!");
+            if (gameState.selectedMembers[0] === gameState.selectedMembers[1]) return alert("TACTICAL CONFIG ERROR: You can't match an operator with themselves!");
+
+            if(gameState.selectedMembers.includes("Shannon")) gameState.teamName = "Error 404: Shannon Not Found";
+            else {
+                const names = ["Ocean Sprayberry", "Boardwalk Vanguard", "The Gantry Guards", "Solarium Seekers"];
+                gameState.teamName = names[Math.floor(Math.random()*names.length)];
+            }
+
+            gameState.active = true;
+            gameState.startTime = new Date().getTime();
+            gameState.lastStopTime = gameState.startTime;
+            gameState.currentStop = 0;
+            gameState.capturedPhotos = [];
+            gameState.stopTimes = [];
+            gameState.assignedStops = generateStopsArray(finalLoc);
+            
+            gameState.bionicFails = 0;
+            gameState.angelCleared = false;
+            gameState.laurelCleared = false;
+            gameState.shannonCleared = false;
+            gameState.shannonAttempts = 0;
+            gameState.abyssBefore = null;
+            gameState.victoryStatus = "";
+
+            let eligibleIndexes = [];
+            for (let i = 0; i < 4; i++) {
+                if (gameState.assignedStops[i].name !== "Bionic Bar") eligibleIndexes.push(i);
+            }
+            eligibleIndexes.sort(() => Math.random() - 0.5); 
+
+            gameState.trapAssignments = { angel: -1, laurel: -1, shannon: -1 };
+            if (gameState.selectedMembers.includes("Angel") && eligibleIndexes.length > 0) gameState.trapAssignments.angel = eligibleIndexes.pop();
+            if (gameState.selectedMembers.includes("Laurel") && eligibleIndexes.length > 0) gameState.trapAssignments.laurel = eligibleIndexes.pop();
+            if (gameState.selectedMembers.includes("Shannon") && eligibleIndexes.length > 0) gameState.trapAssignments.shannon = eligibleIndexes.pop();
+
+            saveState();
+            launchHuntUI();
+        }
+
+        function launchHuntUI() {
+            document.getElementById('setup-step').style.display = 'none';
+            document.getElementById('photobooth-step').style.display = 'none';
+            document.getElementById('hunt-step').style.display = 'block';
+            loadCurrentStop();
+        }
+
+        function loadCurrentStop() {
+            if (gameState.currentStop === gameState.trapAssignments.shannon && !gameState.shannonCleared) {
+                document.getElementById('shannon-lock').style.display = 'flex';
+                gameState.shannonAttempts = 0;
+                saveState();
+                return; 
+            }
+
+            const stop = gameState.assignedStops[gameState.currentStop];
+            document.getElementById('team-name-display').innerText = gameState.teamName + " (" + gameState.deviceSquad + " Squad)";
+            document.getElementById('location-title').innerText = "STOP " + (gameState.currentStop + 1) + ": " + stop.name;
+            document.getElementById('location-drinks').innerText = stop.drinks;
+            
+            if (stop.name === "The Ultimate Abyss" && gameState.abyssBefore) {
+                document.getElementById('location-task').innerText = "BEFORE photo secured! Now ride the slide and take the AFTER selfie at the bottom!";
+            } else {
+                document.getElementById('location-task').innerText = stop.task;
+            }
+
+            document.getElementById('status').innerText = "LOCATION: " + stop.name;
+            document.getElementById('photo-preview').innerHTML = "";
+            document.getElementById('cam-input').value = ""; 
+            
+            if(gameState.capturedPhotos[gameState.currentStop]) {
+                renderStoredImage(gameState.capturedPhotos[gameState.currentStop]);
+                toggleButtons(true);
+            } else {
+                toggleButtons(false);
+            }
+        }
+
+        function toggleButtons(hasPhoto) {
+            document.getElementById('btn-camera').style.display = hasPhoto ? 'none' : 'block';
+            
+            if (hasPhoto) {
+                if (gameState.currentStop < gameState.assignedStops.length - 1) {
+                    document.getElementById('btn-next').style.display = 'block';
+                    document.getElementById('btn-win').style.display = 'none';
+                    document.getElementById('btn-lose').style.display = 'none';
+                } else {
+                    document.getElementById('btn-next').style.display = 'none';
+                    document.getElementById('btn-win').style.display = 'block';
+                    document.getElementById('btn-lose').style.display = 'block';
+                }
+            } else {
+                document.getElementById('btn-next').style.display = 'none';
+                document.getElementById('btn-win').style.display = 'none';
+                document.getElementById('btn-lose').style.display = 'none';
+            }
+        }
+
+        function cameraButtonClicked() {
+            if (gameState.currentStop === gameState.trapAssignments.laurel && !gameState.laurelCleared) {
+                startLaurelTrap();
+            } else {
+                document.getElementById('cam-input').click();
+            }
+        }
+
+        function handlePhoto(input) {
+            if(!input.files || !input.files[0]) return;
+            const currentName = gameState.assignedStops[gameState.currentStop].name;
+
+            if (currentName === "Bionic Bar") {
+                if (gameState.bionicFails < 2) {
+                    gameState.bionicFails++;
+                    saveState();
+                    let msg = (gameState.bionicFails === 1) ? 
+                        "⚠️ The robots are getting micro-aggression vibes because you're acting too human. Please act more robotic in your picture. ⚠️" : 
+                        "⚠️ STILL TOO HUMAN. Logic override: " + botFixes[Math.floor(Math.random()*botFixes.length)] + " ⚠️";
+                    showError(msg);
+                    return;
+                }
+            }
+
+            if (gameState.currentStop === gameState.trapAssignments.angel && !gameState.angelCleared) {
+                gameState.angelCleared = true;
+                saveState();
+                showError("⚠️ IRIS SYNC FAILED: Angel's eyes detected as 'Too Crazy'. Manual override required. ⚠️");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const imgSrc = e.target.result;
+                
+                if (currentName === "The Ultimate Abyss") {
+                    if (!gameState.abyssBefore) {
+                        gameState.abyssBefore = imgSrc;
+                        saveState();
+                        
+                        document.getElementById('photo-preview').innerHTML = "<h4 style='color: var(--p)'>✔️ BEFORE PHOTO SECURED. NOW SURVIVE THE DROP. ✔️</h4>";
+                        const img = document.createElement('img');
+                        img.src = imgSrc;
+                        img.className = 'captured';
+                        document.getElementById('photo-preview').appendChild(img);
+
+                        document.getElementById('location-task').innerText = "BEFORE photo secured! Now ride the slide and take the AFTER selfie at the bottom!";
+                        document.getElementById('btn-camera').style.display = 'block';
+                        return; 
+                    }
+                }
+
+                gameState.capturedPhotos[gameState.currentStop] = imgSrc;
+                
+                if (!gameState.stopTimes[gameState.currentStop]) {
+                    gameState.stopTimes[gameState.currentStop] = new Date().getTime() - gameState.lastStopTime;
+                }
+
+                saveState();
+                renderStoredImage(imgSrc);
+                toggleButtons(true);
+                
+                if(gameState.currentStop === gameState.assignedStops.length - 1) {
+                    document.getElementById('status').innerText = "ALL OBJECTIVES COMPLETE";
+                } else {
+                    document.getElementById('status').innerText = "SECTOR SECURED - AWAITING ADVANCEMENT";
+                }
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+
+        function renderStoredImage(src) {
+            const img = document.createElement('img');
+            img.src = src;
+            img.className = 'captured';
+            document.getElementById('photo-preview').innerHTML = "";
+            document.getElementById('photo-preview').appendChild(img);
+        }
+
+        function advanceStop() {
+            gameState.currentStop++;
+            gameState.lastStopTime = new Date().getTime(); 
+            saveState();
+            loadCurrentStop();
+        }
+
+        let laurelLeftApp = false;
+        const visibilityCheck = () => { if (document.hidden) laurelLeftApp = true; };
+
+        function startLaurelTrap() {
+            document.getElementById('laurel-lock').style.display = 'flex';
+            const btn = document.getElementById('laurel-btn');
+            btn.disabled = true;
+            let countdown = 30;
+            laurelLeftApp = false;
+
+            document.addEventListener('visibilitychange', visibilityCheck);
+            btn.innerText = `Acknowledge & Text Ryan (${countdown}s)`;
+
+            const intv = setInterval(() => {
+                countdown--;
+                if (countdown > 0) {
+                    btn.innerText = `Acknowledge & Text Ryan (${countdown}s)`;
+                } else {
+                    clearInterval(intv);
+                    btn.disabled = false;
+                    btn.innerText = `Acknowledge & Text Ryan`;
+                }
+            }, 1000);
+        }
+
+        function dismissLaurelTrap() {
+            const btn = document.getElementById('laurel-btn');
+            if (!laurelLeftApp) {
+                alert("🚨 SYSTEM ALERT: BYPASS DETECTED 🚨\n\nYou attempted to continue without leaving the app to text Ryan. Trying to game the simulation? Max is going to look ridiculous in those kneepads. 30 SECOND PENALTY APPLIED!");
+                
+                btn.disabled = true;
+                let penaltyCount = 30;
+                btn.innerText = `⚠️ BYPASS DETECTED! Penalty (${penaltyCount}s)`;
+
+                const intv = setInterval(() => {
+                    penaltyCount--;
+                    if (penaltyCount > 0) {
+                        btn.innerText = `⚠️ BYPASS DETECTED! Penalty (${penaltyCount}s)`;
+                    } else {
+                        clearInterval(intv);
+                        btn.disabled = false;
+                        btn.innerText = `Acknowledge & Text Ryan`;
+                    }
+                }, 1000);
+            } else {
+                gameState.laurelCleared = true;
+                saveState();
+                document.getElementById('laurel-lock').style.display = 'none';
+                document.removeEventListener('visibilitychange', visibilityCheck);
+            }
+        }
+
+        function checkRoom() {
+            const val = document.getElementById('room-input').value.trim();
+            const errEl = document.getElementById('room-err');
+            const inputEl = document.getElementById('room-input');
+            const btnEl = document.getElementById('room-btn');
+            
+            if(val === "10220") {
+                document.getElementById('shannon-lock').style.display = 'none';
+                gameState.shannonCleared = true;
+                gameState.lastStopTime = new Date().getTime(); 
+                saveState();
+                loadCurrentStop();
+            } else {
+                gameState.shannonAttempts++;
+                saveState();
+                if(gameState.shannonAttempts === 1) {
+                    errEl.innerText = "⚠️ INCORRECT. Attempt 1 of 3. How do you not know where you live? 🙄 ⚠️";
+                } else if(gameState.shannonAttempts === 2) {
+                    errEl.innerText = "⚠️ STILL WRONG. Attempt 2 of 3. Did you even read the cruise itinerary or just show up to drink? 🍷 ⚠️";
+                } else if(gameState.shannonAttempts >= 3) {
+                    inputEl.disabled = true;
+                    btnEl.disabled = true;
+                    let timeLeft = 60;
+                    errEl.innerText = `🚨 SECURITY LOCKOUT INITIATED 🚨\nPathetic. You're in time-out for ${timeLeft} seconds.`;
+                    
+                    const countdown = setInterval(() => {
+                        timeLeft--;
+                        errEl.innerText = `🚨 SECURITY LOCKOUT INITIATED 🚨\nPathetic. You're in time-out for ${timeLeft} seconds.`;
+                        if(timeLeft <= 0) {
+                            clearInterval(countdown);
+                            inputEl.disabled = false;
+                            btnEl.disabled = false;
+                            inputEl.value = "";
+                            document.getElementById('shannon-lock').style.display = 'none';
+                            gameState.shannonCleared = true;
+                            gameState.lastStopTime = new Date().getTime();
+                            saveState();
+                            loadCurrentStop();
+                        }
+                    }, 1000);
+                }
+            }
+        }
+
+        function finishHunt(status) {
+            gameState.victoryStatus = status; 
+            saveState();
+            generatePhotobooth();
+        }
+
+        function generatePhotobooth() {
+            document.getElementById('status').innerText = "RENDERING SUMMARY PROFILES";
+            const diffMs = new Date().getTime() - gameState.startTime;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffSecs = Math.floor((diffMs % 60000) / 1000);
+            
+            document.getElementById('hunt-step').style.display = 'none';
+            document.getElementById('photobooth-step').style.display = 'block';
+            
+            const trophyEmoji = gameState.victoryStatus === 'WINNERS' ? '🏆' : '😭';
+            const dateStr = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+
+            document.getElementById('strip-team').innerHTML = `${trophyEmoji} OFFICIAL ${gameState.victoryStatus} ${trophyEmoji}<br>${gameState.teamName}`;
+            document.getElementById('strip-time').innerHTML = `📅 ${dateStr} 📅<br>⏱️ Total Mission Time: ${diffMins}m ${diffSecs}s ⏱️`;
+
+            const strip = document.getElementById('strip-photos');
+            strip.innerHTML = "";
+            gameState.capturedPhotos.forEach((src, idx) => {
+                const stopName = gameState.assignedStops[idx].name;
+                
+                if (stopName === "The Ultimate Abyss" && gameState.abyssBefore) {
+                    const wrapB = document.createElement('div');
+                    wrapB.className = 'strip-card';
+                    const imgB = document.createElement('img');
+                    imgB.src = gameState.abyssBefore;
+                    imgB.className = 'strip-img';
+                    imgB.style.marginBottom = '0';
+                    imgB.style.border = 'none';
+                    const capB = document.createElement('div');
+                    capB.className = 'strip-caption';
+                    capB.innerHTML = `📍 The Ultimate Abyss (BEFORE DROP)`;
+                    wrapB.appendChild(imgB);
+                    wrapB.appendChild(capB);
+                    strip.appendChild(wrapB);
+                }
+
+                const wrap = document.createElement('div');
+                wrap.className = 'strip-card';
+                
+                const img = document.createElement('img');
+                img.src = src;
+                img.className = 'strip-img';
+                img.style.marginBottom = '0';
+                img.style.border = 'none';
+                
+                let stopMs = gameState.stopTimes[idx] || 0;
+                let stopM = Math.floor(stopMs / 60000);
+                let stopS = Math.floor((stopMs % 60000) / 1000);
+
+                const cap = document.createElement('div');
+                cap.className = 'strip-caption';
+                
+                if (stopName === "The Ultimate Abyss") {
+                     cap.innerHTML = `📍 The Ultimate Abyss (AFTER DROP)<br><span class="strip-time">⏱️ Leg Time: ${stopM}m ${stopS}s</span>`;
+                } else {
+                     cap.innerHTML = `📍 ${stopName}<br><span class="strip-time">⏱️ Leg Time: ${stopM}m ${stopS}s</span>`;
+                }
+                
+                wrap.appendChild(img);
+                wrap.appendChild(cap);
+                strip.appendChild(wrap);
+            });
+
+            setTimeout(() => {
+                html2canvas(document.getElementById('render-area'), { useCORS: true, backgroundColor: "#0f172a", scale: 2 }).then(canvas => {
+                    const finalImg = document.createElement('img');
+                    finalImg.src = canvas.toDataURL('image/jpeg', 0.9);
+                    finalImg.style.width = "100%";
+                    finalImg.style.border = "4px solid #10b981";
+                    finalImg.style.borderRadius = "10px";
+                    
+                    const targetContainer = document.getElementById('final-export-container');
+                    targetContainer.innerHTML = "";
+                    targetContainer.appendChild(finalImg);
+                    document.getElementById('render-area').style.display = 'none'; 
+                    
+                    const dlBtn = document.createElement('button');
+                    dlBtn.className = 'action';
+                    dlBtn.innerText = '💾 Save Photo Strip';
+                    dlBtn.onclick = () => {
+                        const a = document.createElement('a');
+                        a.href = finalImg.src;
+                        a.download = 'Wonder_Hunt_Strip.jpg';
+                        a.click();
+                    };
+                    targetContainer.appendChild(dlBtn);
+                });
+            }, 800);
+        }
+
+        function showError(txt) {
+            document.getElementById('error-text').innerText = txt;
+            document.getElementById('error-modal').style.display = 'flex';
+        }
+        function closeError() { 
+            document.getElementById('error-modal').style.display = 'none'; 
+            document.getElementById('cam-input').value = ""; 
+        }
+
+        function saveState() {
+            try { localStorage.setItem('wonder_hunt_state', JSON.stringify(gameState)); } 
+            catch(e) { console.warn("Sandbox preventing local storage save."); }
+        }
+        function wipeDataAndReload() {
+            try { localStorage.removeItem('wonder_hunt_state'); } catch(e) {}
+            window.location.reload();
+        }
+        function checkRecovery() {
+            try {
+                const raw = localStorage.getItem('wonder_hunt_state');
+                if (raw) {
+                    const recovered = JSON.parse(raw);
+                    if (recovered && recovered.active) {
+                        gameState = recovered;
+                        document.getElementById('recovery-modal').style.display = 'flex';
+                    }
+                }
+            } catch(e) { console.warn("Sandbox preventing local storage read."); }
+        }
+        function resumeHunt() {
+            document.getElementById('recovery-modal').style.display = 'none';
+            launchHuntUI();
+        }
+    </script>
+</body>
+</html>
